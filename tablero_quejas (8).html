@@ -1,0 +1,1671 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Tablero de Quejas — CEMIC</title>
+<link href="https://fonts.googleapis.com/css2?family=DM+Serif+Display:ital@0;1&family=DM+Sans:wght@300;400;500;600&display=swap" rel="stylesheet">
+<script src="https://cdn.jsdelivr.net/npm/@emailjs/browser@4/dist/email.min.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore-compat.js"></script>
+<style>
+  :root {
+    --bg: #f0f5f1;
+    --surface: #ffffff;
+    --surface2: #e8f2ea;
+    --border: #c8dece;
+    --text: #0f2318;
+    --text-muted: #4a6b54;
+    --queja: #c0392b;
+    --queja-light: #fdecea;
+    --reclamo: #d97706;
+    --reclamo-light: #fef3e2;
+    --sugerencia: #0e7a4e;
+    --sugerencia-light: #d1fae5;
+    --felicitacion: #1d6d3b;
+    --felicitacion-light: #dcfce7;
+    --denuncia: #7c3aed;
+    --denuncia-light: #f5f3ff;
+    --caso-critico: #991b1b;
+    --caso-critico-light: #fee2e2;
+    --green-dark: #0f2318;
+    --green-mid: #1a5c33;
+    --green-main: #1e7a44;
+    --green-light: #2ea05a;
+    --green-pale: #e8f2ea;
+    --accent: #1e7a44;
+    --shadow: 0 1px 3px rgba(0,0,0,0.07), 0 4px 12px rgba(0,0,0,0.04);
+    --shadow-lg: 0 8px 30px rgba(0,0,0,0.10);
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { background: var(--bg); font-family: 'DM Sans', sans-serif; color: var(--text); min-height: 100vh; }
+
+  /* HEADER */
+  header {
+    background: var(--green-dark);
+    color: #fff;
+    padding: 0 40px;
+    display: flex;
+    align-items: stretch;
+    justify-content: space-between;
+    border-bottom: 3px solid var(--green-light);
+    min-height: 76px;
+  }
+  .header-left { display: flex; align-items: center; gap: 20px; padding: 14px 0; }
+  .cemic-logo {
+    display: flex; align-items: center; justify-content: center;
+    background: #fff; border-radius: 10px; padding: 6px 10px; flex-shrink: 0;
+  }
+  .header-divider { width: 1px; background: rgba(255,255,255,0.2); align-self: stretch; margin: 14px 0; }
+  .header-title { font-family: 'DM Serif Display', serif; font-size: 1.5rem; letter-spacing: -0.02em; line-height: 1.2; }
+  .header-title span { color: #6ee7a0; }
+  .header-sub { font-size: 0.73rem; font-weight: 400; opacity: 0.55; margin-top: 3px; letter-spacing: 0.06em; text-transform: uppercase; }
+  .header-date { font-size: 0.82rem; opacity: 0.55; text-align: right; display: flex; flex-direction: column; justify-content: center; }
+  #last-update { font-weight: 600; opacity: 0.9; display: block; margin-top: 2px; font-size: 0.9rem; color: #6ee7a0; }
+
+  /* LAYOUT */
+  main { max-width: 1320px; margin: 0 auto; padding: 36px 40px; }
+  .section-label {
+    font-size: 0.7rem; letter-spacing: 0.12em; text-transform: uppercase;
+    color: var(--text-muted); font-weight: 600; margin-bottom: 14px;
+    display: flex; align-items: center; gap: 8px;
+  }
+  .section-label::after { content: ''; flex: 1; height: 1px; background: var(--border); }
+
+  /* KPI GRID */
+  .kpi-grid { display: grid; grid-template-columns: repeat(5, 1fr); gap: 14px; margin-bottom: 32px; }
+  .kpi-card {
+    background: var(--surface); border-radius: 12px; padding: 20px 18px;
+    box-shadow: var(--shadow); border-top: 3px solid var(--border);
+    transition: transform 0.2s, box-shadow 0.2s;
+  }
+  .kpi-card:hover { transform: translateY(-2px); box-shadow: var(--shadow-lg); }
+  .kpi-card.total { border-top-color: var(--green-main); }
+  .kpi-card.queja { border-top-color: var(--queja); }
+  .kpi-card.reclamo { border-top-color: var(--reclamo); }
+  .kpi-card.sugerencia { border-top-color: var(--sugerencia); }
+  .kpi-card.felicitacion { border-top-color: var(--felicitacion); }
+  .kpi-label { font-size: 0.72rem; text-transform: uppercase; letter-spacing: 0.08em; color: var(--text-muted); font-weight: 600; margin-bottom: 10px; }
+  .kpi-value { font-family: 'DM Serif Display', serif; font-size: 2.6rem; line-height: 1; color: var(--text); }
+  .kpi-pct { font-size: 0.8rem; color: var(--text-muted); margin-top: 4px; }
+
+  /* CHARTS GRID */
+  .main-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 24px; margin-bottom: 32px; }
+  .panel { background: var(--surface); border-radius: 14px; box-shadow: var(--shadow); overflow: hidden; }
+  .panel-header {
+    padding: 16px 22px 13px; border-bottom: 1px solid var(--border);
+    font-size: 0.88rem; font-weight: 600; display: flex; align-items: center; justify-content: space-between;
+    background: var(--green-pale); color: var(--green-mid);
+  }
+  .panel-body { padding: 20px 22px; }
+
+  /* BAR CHART */
+  .bar-row { display: flex; align-items: center; gap: 12px; margin-bottom: 14px; }
+  .bar-label { width: 130px; font-size: 0.78rem; color: var(--text-muted); flex-shrink: 0; text-align: right; }
+  .bar-track { flex: 1; background: var(--surface2); border-radius: 6px; height: 26px; overflow: hidden; }
+  .bar-fill {
+    height: 100%; border-radius: 6px; display: flex; align-items: center;
+    padding-left: 8px; font-size: 0.72rem; font-weight: 600; color: white;
+    transition: width 0.6s cubic-bezier(0.34,1.56,0.64,1); min-width: 2px;
+  }
+
+  /* STATUS */
+  .status-list { display: flex; flex-direction: column; gap: 10px; }
+  .status-item { display: flex; align-items: center; justify-content: space-between; padding: 10px 14px; border-radius: 8px; background: var(--surface2); font-size: 0.84rem; }
+  .status-dot { width: 10px; height: 10px; border-radius: 50%; margin-right: 10px; flex-shrink: 0; }
+  .status-name { flex: 1; font-weight: 500; display: flex; align-items: center; }
+  .status-count { font-family: 'DM Serif Display', serif; font-size: 1.4rem; }
+  .status-pct { font-size: 0.74rem; color: var(--text-muted); margin-left: 8px; }
+
+  /* CRITICALITY */
+  .crit-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+  .crit-card { border-radius: 10px; padding: 16px; text-align: center; }
+  .crit-card.critica { background: #7f1d1d; color: white; }
+  .crit-card.alta { background: var(--queja-light); border: 1px solid #fca5a5; }
+  .crit-card.media { background: var(--reclamo-light); border: 1px solid #fcd34d; }
+  .crit-card.baja { background: var(--felicitacion-light); border: 1px solid #6ee7b7; }
+  .crit-num { font-family: 'DM Serif Display', serif; font-size: 2rem; }
+  .crit-label { font-size: 0.72rem; text-transform: uppercase; letter-spacing: 0.08em; margin-top: 2px; font-weight: 600; opacity: 0.75; }
+
+  /* PIE CHART */
+  .pie-wrap { display: flex; align-items: center; gap: 20px; }
+  .pie-legend { flex: 1; display: flex; flex-direction: column; gap: 8px; }
+  .pie-legend-item { display: flex; align-items: center; gap: 8px; font-size: 0.8rem; }
+  .pie-legend-dot { width: 11px; height: 11px; border-radius: 50%; flex-shrink: 0; }
+  .pie-legend-name { flex: 1; color: var(--text-muted); }
+  .pie-legend-val { font-weight: 600; font-size: 0.82rem; }
+  .pie-legend-pct { font-size: 0.72rem; color: var(--text-muted); margin-left: 4px; }
+
+  /* FILTER PANEL */
+  .filter-panel {
+    background: var(--surface); border-radius: 14px; box-shadow: var(--shadow);
+    border-left: 4px solid var(--green-main); padding: 18px 24px; margin-bottom: 24px;
+  }
+  .filter-panel-header {
+    font-size: 0.72rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.1em;
+    color: var(--green-mid); margin-bottom: 14px; display: flex; align-items: center; gap: 8px;
+  }
+  .filter-count-badge {
+    background: var(--green-main); color: white; border-radius: 20px;
+    padding: 2px 10px; font-size: 0.72rem; font-weight: 700;
+  }
+  .filter-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(175px, 1fr)); gap: 12px; align-items: end; }
+  .filter-group { display: flex; flex-direction: column; gap: 5px; }
+  .filter-group label { font-size: 0.67rem; font-weight: 600; text-transform: uppercase; letter-spacing: 0.07em; color: var(--text-muted); }
+  .filter-span2 { grid-column: span 2; }
+
+  /* TABLE */
+  .full-panel { background: var(--surface); border-radius: 14px; box-shadow: var(--shadow); overflow: hidden; margin-bottom: 32px; }
+  .table-toolbar {
+    padding: 14px 22px; border-bottom: 1px solid var(--border);
+    display: flex; align-items: center; justify-content: space-between;
+    gap: 12px; flex-wrap: wrap; background: var(--green-pale);
+  }
+  .toolbar-title { font-size: 0.88rem; font-weight: 600; color: var(--green-mid); display: flex; align-items: center; gap: 8px; }
+  .table-wrapper { overflow-x: auto; max-height: 480px; overflow-y: auto; }
+  .table-wrapper thead th { position: sticky; top: 0; z-index: 2; }
+
+  input[type="text"], input[type="date"], select {
+    border: 1px solid var(--border); border-radius: 8px; padding: 7px 11px;
+    font-family: 'DM Sans', sans-serif; font-size: 0.82rem;
+    background: var(--surface); color: var(--text); outline: none;
+    transition: border-color 0.2s, box-shadow 0.2s; width: 100%;
+  }
+  input[type="text"]:focus, input[type="date"]:focus, select:focus {
+    border-color: var(--green-main); box-shadow: 0 0 0 3px rgba(30,122,68,0.1);
+  }
+
+  .btn {
+    background: var(--green-main); color: white; border: none; border-radius: 8px;
+    padding: 8px 16px; font-family: 'DM Sans', sans-serif; font-size: 0.82rem;
+    font-weight: 600; cursor: pointer; transition: background 0.2s; white-space: nowrap;
+  }
+  .btn:hover { background: var(--green-mid); }
+  .btn-outline { background: transparent; border: 1px solid var(--border); color: var(--text); }
+  .btn-outline:hover { background: var(--surface2); }
+  .btn-ghost { background: transparent; border: 1px solid var(--border); color: var(--text-muted); padding: 7px 12px; }
+  .btn-ghost:hover { background: var(--surface2); color: var(--text); }
+  .btn-danger { background: var(--queja); }
+  .btn-danger:hover { background: #a93226; }
+
+  table { width: 100%; border-collapse: collapse; font-size: 0.82rem; }
+  thead th {
+    background: var(--surface2); padding: 11px 14px; text-align: left;
+    font-size: 0.68rem; text-transform: uppercase; letter-spacing: 0.06em;
+    color: var(--text-muted); font-weight: 600; white-space: nowrap;
+  }
+  tbody tr { border-bottom: 1px solid var(--border); transition: background 0.15s; }
+  tbody tr:hover { background: var(--surface2); }
+  tbody td { padding: 11px 14px; vertical-align: middle; }
+  tbody tr:last-child { border-bottom: none; }
+
+  .badge { display: inline-flex; align-items: center; gap: 5px; padding: 3px 9px; border-radius: 20px; font-size: 0.7rem; font-weight: 600; white-space: nowrap; }
+  .badge-queja { background: var(--queja-light); color: var(--queja); }
+  .badge-quejareclamo { background: #fff3e0; color: #b45309; }
+  .badge-reclamo { background: var(--reclamo-light); color: var(--reclamo); }
+  .badge-sugerencia { background: var(--sugerencia-light); color: var(--sugerencia); }
+  .badge-felicitacion { background: var(--felicitacion-light); color: var(--felicitacion); }
+  .badge-denuncia { background: var(--denuncia-light); color: var(--denuncia); }
+  .badge-casocritico { background: var(--caso-critico-light); color: var(--caso-critico); }
+
+  .crit-badge { display: inline-block; padding: 2px 8px; border-radius: 4px; font-size: 0.68rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.05em; }
+  .crit-badge.Critica { background: #7f1d1d; color: white; }
+  .crit-badge.Alta { background: #fee2e2; color: var(--queja); }
+  .crit-badge.Media { background: var(--reclamo-light); color: var(--reclamo); }
+  .crit-badge.Baja { background: var(--felicitacion-light); color: var(--felicitacion); }
+
+  .status-badge { display: inline-block; padding: 2px 9px; border-radius: 20px; font-size: 0.7rem; font-weight: 600; }
+  .vencido { color: var(--queja); font-weight: 600; }
+  .empty-state { text-align: center; padding: 40px; color: var(--text-muted); font-size: 0.88rem; }
+
+  /* ALERTA */
+  .alert-bar { background: #7f1d1d; color: white; border-radius: 10px; padding: 12px 20px; margin-bottom: 24px; display: flex; align-items: center; gap: 12px; font-size: 0.84rem; font-weight: 500; }
+  .alert-bar.hidden { display: none; }
+
+  /* MODAL */
+  .modal-overlay { display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.5); z-index: 100; align-items: center; justify-content: center; }
+  .modal-overlay.active { display: flex; }
+  .modal { background: var(--surface); border-radius: 16px; padding: 32px; width: 680px; max-width: 95vw; max-height: 90vh; overflow-y: auto; box-shadow: var(--shadow-lg); animation: slideUp 0.25s ease; }
+  @keyframes slideUp { from { transform: translateY(20px); opacity: 0; } to { transform: translateY(0); opacity: 1; } }
+  .modal-title { font-family: 'DM Serif Display', serif; font-size: 1.4rem; margin-bottom: 24px; color: var(--green-mid); }
+  .form-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+  .form-group { display: flex; flex-direction: column; gap: 6px; }
+  .form-group.full { grid-column: 1 / -1; }
+  .form-group label { font-size: 0.72rem; font-weight: 600; text-transform: uppercase; letter-spacing: 0.06em; color: var(--text-muted); }
+  .form-group input, .form-group select, .form-group textarea {
+    border: 1px solid var(--border); border-radius: 8px; padding: 9px 12px;
+    font-family: 'DM Sans', sans-serif; font-size: 0.85rem; background: var(--surface);
+    color: var(--text); outline: none; width: 100%; transition: border-color 0.2s, box-shadow 0.2s;
+  }
+  .form-group textarea { resize: vertical; min-height: 80px; }
+  .form-group input:focus, .form-group select:focus, .form-group textarea:focus { border-color: var(--green-main); box-shadow: 0 0 0 3px rgba(30,122,68,0.1); }
+  .modal-actions { display: flex; gap: 10px; justify-content: flex-end; margin-top: 24px; }
+
+  .form-section-divider { grid-column: 1 / -1; display: flex; align-items: center; gap: 10px; margin: 8px 0 2px; }
+  .form-section-divider span { font-size: 0.67rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.1em; color: var(--green-mid); white-space: nowrap; background: var(--green-pale); padding: 2px 8px; border-radius: 4px; }
+  .form-section-divider::after { content: ''; flex: 1; height: 1px; background: var(--border); }
+
+  @media (max-width: 900px) {
+    .kpi-grid { grid-template-columns: repeat(3, 1fr); }
+    .main-grid { grid-template-columns: 1fr; }
+    main { padding: 20px; }
+    header { padding: 16px 20px; flex-direction: column; gap: 10px; min-height: auto; }
+    .filter-grid { grid-template-columns: 1fr 1fr; }
+    .filter-span2 { grid-column: span 1; }
+  }
+
+  /* ── LOGIN ─────────────────────────────────────────────── */
+  #login-screen {
+    position: fixed; inset: 0; background: var(--green-dark);
+    display: flex; align-items: center; justify-content: center;
+    z-index: 9999; flex-direction: column; gap: 0;
+  }
+  #login-screen.hidden { display: none; }
+  .login-card {
+    background: var(--surface); border-radius: 20px; padding: 40px 44px;
+    width: 420px; max-width: 95vw; box-shadow: var(--shadow-lg);
+    animation: slideUp 0.3s ease;
+  }
+  .login-logo { display: flex; justify-content: center; margin-bottom: 24px; }
+  .login-logo img { height: 44px; }
+  .login-title { font-family: 'DM Serif Display', serif; font-size: 1.6rem; color: var(--green-dark); margin-bottom: 4px; text-align: center; }
+  .login-sub { font-size: 0.78rem; color: var(--text-muted); text-align: center; margin-bottom: 28px; text-transform: uppercase; letter-spacing: 0.07em; }
+  .login-group { display: flex; flex-direction: column; gap: 6px; margin-bottom: 16px; }
+  .login-group label { font-size: 0.7rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.08em; color: var(--text-muted); }
+  .login-group input { border: 1.5px solid var(--border); border-radius: 10px; padding: 11px 14px; font-family: 'DM Sans', sans-serif; font-size: 0.9rem; color: var(--text); outline: none; transition: border-color 0.2s, box-shadow 0.2s; }
+  .login-group input:focus { border-color: var(--green-main); box-shadow: 0 0 0 3px rgba(30,122,68,0.12); }
+  .btn-login { width: 100%; padding: 13px; background: var(--green-main); color: white; border: none; border-radius: 10px; font-family: 'DM Sans', sans-serif; font-size: 0.95rem; font-weight: 700; cursor: pointer; margin-top: 8px; transition: background 0.2s; letter-spacing: 0.02em; }
+  .btn-login:hover { background: var(--green-mid); }
+  .login-error { background: #fdecea; color: var(--queja); border-radius: 8px; padding: 9px 14px; font-size: 0.82rem; font-weight: 500; margin-bottom: 14px; display: none; text-align: center; }
+  .login-error.show { display: block; }
+
+  /* ── USER BAR ──────────────────────────────────────────── */
+  .user-bar {
+    display: flex; align-items: center; gap: 12px;
+    background: rgba(255,255,255,0.08); border-radius: 10px;
+    padding: 6px 14px 6px 10px; cursor: default;
+  }
+  .user-avatar {
+    width: 32px; height: 32px; border-radius: 50%;
+    background: var(--green-light); display: flex; align-items: center; justify-content: center;
+    font-size: 0.85rem; font-weight: 700; color: white; flex-shrink: 0;
+  }
+  .user-info { display: flex; flex-direction: column; line-height: 1.2; }
+  .user-name { font-size: 0.82rem; font-weight: 600; color: white; }
+  .user-role { font-size: 0.65rem; color: rgba(255,255,255,0.5); text-transform: uppercase; letter-spacing: 0.06em; }
+  .btn-logout { background: rgba(255,255,255,0.1); border: 1px solid rgba(255,255,255,0.2); color: rgba(255,255,255,0.7); border-radius: 7px; padding: 5px 11px; font-size: 0.72rem; cursor: pointer; transition: background 0.2s; font-family: 'DM Sans', sans-serif; }
+  .btn-logout:hover { background: rgba(255,255,255,0.2); color: white; }
+
+  /* ── VISTA USUARIO ─────────────────────────────────────── */
+  #user-view { display: none; max-width: 1100px; margin: 0 auto; padding: 36px 40px; }
+  #user-view.active { display: block; }
+  .user-welcome { font-family: 'DM Serif Display', serif; font-size: 1.5rem; color: var(--green-dark); margin-bottom: 4px; }
+  .user-welcome-sub { font-size: 0.82rem; color: var(--text-muted); margin-bottom: 28px; }
+  .case-card {
+    background: var(--surface); border-radius: 14px; box-shadow: var(--shadow);
+    margin-bottom: 18px; overflow: hidden; border-left: 4px solid var(--border);
+    transition: box-shadow 0.2s;
+  }
+  .case-card:hover { box-shadow: var(--shadow-lg); }
+  .case-card.queja { border-left-color: var(--queja); }
+  .case-card.quejareclamo { border-left-color: #b45309; }
+  .case-card.reclamo { border-left-color: var(--reclamo); }
+  .case-card.sugerencia { border-left-color: var(--sugerencia); }
+  .case-card.felicitacion { border-left-color: var(--felicitacion); }
+  .case-card.denuncia { border-left-color: var(--denuncia); }
+  .case-card.casocritico { border-left-color: var(--caso-critico); }
+  .case-card-header { padding: 16px 22px 12px; border-bottom: 1px solid var(--border); display: flex; align-items: center; gap: 12px; flex-wrap: wrap; background: var(--green-pale); }
+  .case-card-id { font-family: 'DM Serif Display', serif; font-size: 1.1rem; color: var(--green-mid); }
+  .case-card-meta { font-size: 0.75rem; color: var(--text-muted); margin-left: auto; }
+  .case-card-body { padding: 18px 22px; }
+  .case-relato { font-size: 0.88rem; color: var(--text); line-height: 1.6; margin-bottom: 16px; background: var(--surface2); border-radius: 8px; padding: 12px 14px; }
+  .case-relato-label { font-size: 0.67rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.08em; color: var(--text-muted); margin-bottom: 6px; }
+  .case-respuesta { margin-top: 12px; }
+  .case-respuesta textarea { width: 100%; border: 1.5px solid var(--border); border-radius: 10px; padding: 11px 14px; font-family: 'DM Sans', sans-serif; font-size: 0.85rem; resize: vertical; min-height: 90px; outline: none; transition: border-color 0.2s, box-shadow 0.2s; color: var(--text); background: var(--surface); }
+  .case-respuesta textarea:focus { border-color: var(--green-main); box-shadow: 0 0 0 3px rgba(30,122,68,0.1); }
+  .case-respuesta-actions { display: flex; gap: 10px; margin-top: 10px; align-items: center; }
+  .respuesta-saved { font-size: 0.78rem; color: var(--green-main); font-weight: 600; opacity: 0; transition: opacity 0.4s; }
+  .respuesta-saved.show { opacity: 1; }
+  .user-empty { text-align: center; padding: 60px 20px; color: var(--text-muted); }
+  .user-empty-icon { font-size: 3rem; margin-bottom: 12px; }
+  .user-stats { display: flex; gap: 14px; margin-bottom: 28px; flex-wrap: wrap; }
+  .user-stat { background: var(--surface); border-radius: 12px; padding: 14px 20px; box-shadow: var(--shadow); flex: 1; min-width: 120px; border-top: 3px solid var(--green-main); }
+  .user-stat-num { font-family: 'DM Serif Display', serif; font-size: 2rem; line-height: 1; }
+  .user-stat-label { font-size: 0.7rem; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.07em; margin-top: 4px; }
+
+  .caso-row:hover { background: var(--green-light) !important; }
+  .caso-row-active { background: #e8f5ee !important; }
+  .caso-row-active td { border-bottom: none !important; }
+  .detalle-panel {
+    background: #f8fdf9;
+    border-left: 4px solid var(--green-main);
+    padding: 16px 20px;
+    animation: slideDown 0.2s ease;
+  }
+  @keyframes slideDown { from { opacity:0; transform:translateY(-6px); } to { opacity:1; transform:translateY(0); } }
+  .detalle-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+    gap: 16px;
+  }
+  .detalle-label {
+    font-size: 0.68rem;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    color: var(--green-main);
+    margin-bottom: 4px;
+  }
+  .detalle-val { font-size: 0.82rem; color: var(--text); }
+  .detalle-relato {
+    background: white;
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    padding: 8px 10px;
+    font-size: 0.8rem;
+    line-height: 1.5;
+    color: var(--text);
+    max-height: 80px;
+    overflow-y: auto;
+  }
+
+  .inline-estado-select { min-width: 160px; outline: none; transition: box-shadow 0.15s; }
+  .inline-estado-select:hover { box-shadow: 0 0 0 2px rgba(0,0,0,0.1); }
+  .form-group input.field-error,
+  .form-group select.field-error,
+  .form-group textarea.field-error {
+    border-color: #dc2626 !important;
+    background: #fff5f5 !important;
+    box-shadow: 0 0 0 2px rgba(220,38,38,0.15);
+  }
+  #modal-validation-msg {
+    color: #dc2626; font-size: 0.82rem; background: #fff5f5;
+    border: 1px solid #fca5a5; border-radius: 8px;
+    padding: 8px 14px; margin-bottom: 10px; display: none;
+  }
+  .resp-history { background: #f0fdf4; border: 1px solid #bbf7d0; border-radius: 8px; padding: 12px 14px; margin-bottom: 12px; font-size: 0.84rem; color: var(--green-mid); }
+  .resp-history-label { font-size: 0.65rem; font-weight: 700; text-transform: uppercase; color: #15803d; letter-spacing: 0.07em; margin-bottom: 4px; }
+
+  /* ── MODAL CAMBIO DE CONTRASEÑA ──────────────────────── */
+  /* ── TABS ────────────────────────────────────────── */
+  .tabs-bar {
+    display: flex;
+    background: var(--surface);
+    border-bottom: 2px solid var(--border);
+    padding: 0 24px;
+    margin-bottom: 0;
+    position: sticky;
+    top: 0;
+    z-index: 10;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.05);
+  }
+  .tab-btn {
+    padding: 14px 30px;
+    font-family: 'DM Sans', sans-serif;
+    font-size: 0.88rem;
+    font-weight: 600;
+    color: var(--text-muted);
+    background: none;
+    border: none;
+    border-bottom: 3px solid transparent;
+    margin-bottom: -2px;
+    cursor: pointer;
+    transition: all 0.2s;
+    letter-spacing: 0.02em;
+  }
+  .tab-btn:hover { color: var(--green-main); }
+  .tab-btn.active { color: var(--green-main); border-bottom-color: var(--green-main); }
+  .tab-content { display: none; padding: 24px; }
+  .tab-content.active { display: block; }
+
+  .btn-change-pass {
+    background: rgba(255,255,255,0.1); border: 1px solid rgba(255,255,255,0.2);
+    color: rgba(255,255,255,0.7); border-radius: 7px; padding: 5px 11px;
+    font-size: 0.72rem; cursor: pointer; transition: background 0.2s;
+    font-family: 'DM Sans', sans-serif; margin-right: 4px;
+  }
+  .btn-change-pass:hover { background: rgba(255,255,255,0.2); color: white; }
+
+  /* ── ESTADO SELECTOR RESPONSABLE ─────────────────────── */
+  .resp-estado-select {
+    padding: 7px 10px; font-size: 0.8rem; border-radius: 8px;
+    border: 1px solid var(--border); font-family: 'DM Sans', sans-serif;
+    background: var(--surface); color: var(--text); cursor: pointer;
+    width: auto;
+  }
+  .resp-estado-pendiente { background: #f3f4f6; color: #6b7280; }
+  .resp-estado-enviada { background: #d1fae5; color: #065f46; }
+</style>
+</head>
+<body>
+
+<!-- ── LOGIN SCREEN ──────────────────────────────────────────── -->
+<div id="login-screen">
+  <div class="login-card">
+    <div class="login-logo" style="background:#1e7a44;margin:-32px -32px 24px -32px;padding:20px;border-radius:12px 12px 0 0;text-align:center">
+      <img src="data:image/png;base64,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" alt="CEMIC" style="height:44px;display:inline-block;">
+    </div>
+    <div class="login-title">Gestión de Quejas</div>
+    <div class="login-sub">Ingresá con tus credenciales</div>
+    <div class="login-error" id="login-error">Email o contraseña incorrectos</div>
+    <div class="login-group">
+      <label>Email</label>
+      <input type="text" id="login-email" placeholder="usuario@cemic.com" autocomplete="username">
+    </div>
+    <div class="login-group">
+      <label>Contraseña</label>
+      <input type="password" id="login-pass" placeholder="••••••••" autocomplete="current-password">
+    </div>
+    <button class="btn-login" onclick="doLogin()">Ingresar</button>
+  </div>
+</div>
+
+<header>
+  <div class="header-left">
+    <div class="cemic-logo">
+      <img src="data:image/png;base64,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" alt="CEMIC" style="height:40px;display:block;">
+    </div>
+    <div class="header-divider"></div>
+    <div>
+      <div class="header-title">Gestión de <span>Quejas</span></div>
+      <div class="header-sub">Sistema de Seguimiento de Presentaciones Ciudadanas</div>
+    </div>
+  </div>
+  <div class="header-date" style="display:flex;align-items:center;gap:14px">
+    <div>
+      <div style="font-size:0.73rem;opacity:0.55;text-align:right">Última actualización:</div>
+      <span id="last-update" style="font-weight:600;color:#6ee7a0;display:block;font-size:0.9rem">—</span>
+    </div>
+    <div class="user-bar" id="user-bar">
+      <div class="user-avatar" id="user-avatar">A</div>
+      <div class="user-info">
+        <span class="user-name" id="user-display-name">Usuario</span>
+        <span class="user-role" id="user-display-role">rol</span>
+      </div>
+    </div>
+    <button class="btn-change-pass" onclick="openChangePass()">🔑 Clave</button>
+    <button class="btn-logout" onclick="doLogout()">Salir</button>
+  </div>
+</header>
+
+<main>
+
+  <div class="alert-bar hidden" id="alertCritica">
+    <span style="font-size:1.2rem">⚠️</span>
+    <span id="alertCriticaMsg"></span>
+  </div>
+
+  <!-- PESTAÑAS -->
+  <div class="tabs-bar">
+    <button class="tab-btn active" onclick="switchTab('casos')">📋 Casos</button>
+    <button class="tab-btn" onclick="switchTab('tablero')">📊 Tablero</button>
+  </div>
+
+  <!-- PESTAÑA TABLERO -->
+  <div class="tab-content" id="tab-tablero">
+
+  <!-- FILTROS EN TABLERO -->
+  <div class="section-label">Filtros</div>
+  <div class="filter-panel">
+    <div class="filter-panel-header">🔍 Filtrar</div>
+    <div class="filter-grid">
+      <div class="filter-group filter-span2">
+        <label>Buscar</label>
+        <input type="text" id="t-search-input" placeholder="Buscar en todos los campos..." oninput="syncFilters()">
+      </div>
+      <div class="filter-group">
+        <label>Sede</label>
+        <select id="t-filter-sede" onchange="syncFilters()">
+          <option value="">Todas las sedes</option>
+          <option>Saavedra</option><option>Pombo</option><option>Las Heras</option><option>Talcahuano</option><option>Ballester</option><option>San Isidro</option><option>Belgrano</option><option>Carabobo</option>
+        </select>
+      </div>
+      <div class="filter-group">
+        <label>Tipo de Presentación</label>
+        <select id="t-filter-tipo" onchange="syncFilters()">
+          <option value="">Todos los tipos</option>
+          <option>Queja / Reclamo</option><option>Sugerencia</option><option>Felicitación</option><option>Denuncia</option><option>Caso Crítico</option>
+        </select>
+      </div>
+      <div class="filter-group">
+        <label>Estado</label>
+        <select id="t-filter-estado" onchange="syncFilters()">
+          <option value="">Todos los estados</option>
+          <option>Pendiente</option><option>Derivado a Responsable</option><option>Respuesta del Responsable</option><option>Cerrado</option>
+        </select>
+      </div>
+      <div class="filter-group">
+        <label>Fecha desde</label>
+        <input type="date" id="t-filter-fecha-desde" onchange="syncFilters()">
+      </div>
+      <div class="filter-group">
+        <label>Fecha hasta</label>
+        <input type="date" id="t-filter-fecha-hasta" onchange="syncFilters()">
+      </div>
+      <div class="filter-group">
+        <label>Vencimiento</label>
+        <select id="t-filter-vencimiento" onchange="syncFilters()">
+          <option value="">Todos</option>
+          <option value="vencido">⛔ Vencidos</option>
+          <option value="48hs">⚠️ Próximos a vencer (48hs)</option>
+        </select>
+      </div>
+      <div class="filter-group" style="justify-content:flex-end">
+        <label>&nbsp;</label>
+        <button class="btn btn-ghost" onclick="clearFilters()" style="width:100%">✕ Limpiar filtros</button>
+      </div>
+    </div>
+  </div>
+
+  <div class="section-label">Resumen General</div>
+  <div class="kpi-grid">
+    <div class="kpi-card total">
+      <div class="kpi-label">Total Presentaciones</div>
+      <div class="kpi-value" id="kpi-total">0</div>
+      <div class="kpi-pct" id="kpi-total-sub">casos registrados</div>
+    </div>
+    <div class="kpi-card queja">
+      <div class="kpi-label">Quejas / Reclamos</div>
+      <div class="kpi-value" id="kpi-quejas">0</div>
+      <div class="kpi-pct" id="kpi-quejas-pct">—</div>
+    </div>
+    <div class="kpi-card reclamo">
+      <div class="kpi-label">Casos Críticos</div>
+      <div class="kpi-value" id="kpi-reclamos">0</div>
+      <div class="kpi-pct" id="kpi-reclamos-pct">—</div>
+    </div>
+    <div class="kpi-card felicitacion">
+      <div class="kpi-label">Felicitaciones</div>
+      <div class="kpi-value" id="kpi-felicitaciones">0</div>
+      <div class="kpi-pct" id="kpi-felicitaciones-pct">—</div>
+    </div>
+    <div class="kpi-card sugerencia">
+      <div class="kpi-label">Sugerencias</div>
+      <div class="kpi-value" id="kpi-sugerencias">0</div>
+      <div class="kpi-pct" id="kpi-sugerencias-pct">—</div>
+    </div>
+  </div>
+
+  <div class="section-label">Análisis</div>
+  <div class="main-grid">
+
+    <!-- TORTA: Distribución por tipo -->
+    <div class="panel">
+      <div class="panel-header">
+        Distribución por Tipo
+        <span style="font-size:0.75rem;font-weight:400">presentaciones</span>
+      </div>
+      <div class="panel-body">
+        <div class="pie-wrap">
+          <svg id="pie-svg" width="160" height="160" viewBox="0 0 160 160" style="flex-shrink:0">
+            <circle cx="80" cy="80" r="55" fill="none" stroke="#e8f2ea" stroke-width="28" class="pie-bg"/>
+            <text x="80" y="76" text-anchor="middle" font-family="DM Serif Display,serif" font-size="28" fill="#0f2318" id="pie-center-num">0</text>
+            <text x="80" y="90" text-anchor="middle" font-family="DM Sans,sans-serif" font-size="9" fill="#4a6b54">casos</text>
+          </svg>
+          <div class="pie-legend" id="pie-legend">
+            <div class="empty-state" style="padding:8px 0">Sin datos</div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Estado -->
+    <div class="panel">
+      <div class="panel-header">Estado de Casos</div>
+      <div class="panel-body">
+        <div class="status-list" id="chart-estados">
+          <div class="empty-state">Sin datos aún</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Criticidad -->
+    <div class="panel">
+      <div class="panel-header">Niveles de Criticidad</div>
+      <div class="panel-body">
+        <div class="crit-grid">
+          <div class="crit-card critica"><div class="crit-num" id="c-critica">0</div><div class="crit-label">Crítica</div></div>
+          <div class="crit-card alta"><div class="crit-num" id="c-alta">0</div><div class="crit-label">Alta</div></div>
+          <div class="crit-card media"><div class="crit-num" id="c-media">0</div><div class="crit-label">Media</div></div>
+          <div class="crit-card baja"><div class="crit-num" id="c-baja">0</div><div class="crit-label">Baja</div></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Sectores -->
+    <div class="panel">
+      <div class="panel-header">
+        Presentaciones por Servicio
+        <span style="font-size:0.75rem;font-weight:400">top sectores</span>
+      </div>
+      <div class="panel-body" id="chart-sectores">
+        <div class="empty-state">Sin datos aún</div>
+      </div>
+    </div>
+
+  </div>
+
+  </div><!-- /tab-tablero -->
+
+  <!-- PESTAÑA CASOS -->
+  <div class="tab-content active" id="tab-casos">
+
+  <!-- FILTROS -->
+  <div class="section-label">Filtros</div>
+  <div class="filter-panel">
+    <div class="filter-panel-header">
+      🔍 Filtrar casos
+      <span class="filter-count-badge" id="filter-active-count" style="display:none"></span>
+    </div>
+    <div class="filter-grid">
+      <div class="filter-group filter-span2">
+        <label>Buscar (nombre, apellido, servicio, motivo, responsable, relato...)</label>
+        <input type="text" id="search-input" placeholder="Escribir para buscar en todos los campos...">
+      </div>
+      <div class="filter-group">
+        <label>Sede</label>
+        <select id="filter-sede">
+          <option value="">Todas las sedes</option>
+          <option>Saavedra</option><option>Pombo</option><option>Las Heras</option><option>Talcahuano</option><option>Ballester</option><option>San Isidro</option><option>Belgrano</option><option>Carabobo</option>
+        </select>
+      </div>
+      <div class="filter-group">
+        <label>Servicio / Sector</label>
+        <select id="filter-servicio">
+          <option value="">Todos los servicios</option>
+          <option>Guardia</option><option>Internación</option><option>Facturación</option>
+          <option>Enfermería</option><option>Cirugía</option><option>Clínica Médica</option>
+          <option>Pediatría</option><option>Obstetricia</option><option>Admisión</option>
+          <option>Farmacia</option><option>Laboratorio</option><option>Diagnóstico por Imágenes</option><option>Otro</option>
+        </select>
+      </div>
+      <div class="filter-group">
+        <label>Tipo de Presentación</label>
+        <select id="filter-tipo">
+          <option value="">Todos los tipos</option>
+          <option>Queja / Reclamo</option><option>Sugerencia</option><option>Felicitación</option><option>Denuncia</option><option>Caso Crítico</option>
+        </select>
+      </div>
+      <div class="filter-group">
+        <label>Estado</label>
+        <select id="filter-estado">
+          <option value="">Todos los estados</option>
+          <option>Pendiente</option><option>Derivado a Responsable</option><option>Respuesta del Responsable</option><option>Cerrado</option>
+        </select>
+      </div>
+      <div class="filter-group">
+        <label>Criticidad</label>
+        <select id="filter-criticidad">
+          <option value="">Toda criticidad</option>
+          <option>Crítica</option><option>Alta</option><option>Media</option><option>Baja</option>
+        </select>
+      </div>
+      <div class="filter-group">
+        <label>Motivo / Clasificación</label>
+        <select id="filter-motivo">
+          <option value="">Todos los motivos</option>
+          <option>Demora / acceso</option><option>Facturación / cobertura</option>
+          <option>Trato / comunicación</option><option>Seguridad del paciente</option>
+          <option>Infraestructura</option><option>Medicación</option>
+          <option>Información / documentación</option><option>Proceso clínico</option><option>Otro</option>
+        </select>
+      </div>
+      <div class="filter-group">
+        <label>Fecha desde</label>
+        <input type="date" id="filter-fecha-desde">
+      </div>
+      <div class="filter-group">
+        <label>Fecha hasta</label>
+        <input type="date" id="filter-fecha-hasta">
+      </div>
+      <div class="filter-group">
+        <label>Vencimiento</label>
+        <select id="filter-vencimiento">
+          <option value="">Todos</option>
+          <option value="vencido">⛔ Vencidos</option>
+          <option value="48hs">⚠️ Próximos a vencer (48hs)</option>
+        </select>
+      </div>
+      <div class="filter-group" style="justify-content:flex-end">
+        <label>&nbsp;</label>
+        <button class="btn btn-ghost" onclick="clearFilters()" style="width:100%">✕ Limpiar filtros</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- TABLA -->
+  <div class="section-label">Registro de Casos</div>
+  <div class="full-panel">
+    <div class="table-toolbar">
+      <div class="toolbar-title">📋 <span id="tabla-count">0 casos</span></div>
+      <div style="display:flex;gap:8px;align-items:center">
+        <button class="btn btn-outline" onclick="exportarExcel()" style="font-size:0.8rem;padding:7px 14px">⬇️ Exportar Excel</button>
+        <button class="btn" id="btn-nuevo-caso" onclick="openModal()">+ Nuevo caso</button>
+      </div>
+    </div>
+    <div class="table-wrapper">
+      <table>
+        <thead>
+          <tr>
+            <th>ID</th><th>Fecha</th><th>Sede / Servicio</th><th>Tipo</th>
+            <th>Paciente</th><th>Criticidad</th>
+            <th>Responsable</th><th>Estado</th><th>Venc.</th><th></th>
+          </tr>
+        </thead>
+        <tbody id="tabla-body">
+          <tr><td colspan="12" class="empty-state">Sin casos registrados</td></tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+  </div><!-- /tab-casos -->
+
+</main>
+
+<!-- ── VISTA USUARIO ──────────────────────────────────────────── -->
+<div id="user-view">
+  <div class="user-welcome" id="user-welcome-title">Bienvenido/a</div>
+  <div class="user-welcome-sub" id="user-welcome-sub">Estas son las presentaciones derivadas a vos.</div>
+  <div class="user-stats" id="user-stats-bar"></div>
+  <div id="user-cases-list">
+    <div class="user-empty"><div class="user-empty-icon">📭</div><div>No tenés casos asignados.</div></div>
+  </div>
+</div>
+
+<!-- MODAL -->
+<div class="modal-overlay" id="modal-overlay">
+  <div class="modal">
+    <div class="modal-title" id="modal-title">Nuevo Caso</div>
+    <div class="form-grid">
+
+      <div class="form-section-divider"><span>📅 Fecha y Lugar</span></div>
+      <div class="form-group"><label>Fecha de Ingreso <span class="req">*</span></label><input type="date" id="f-fecha"></div>
+      <div class="form-group"><label>Hora de Ingreso <span class="req">*</span></label><input type="time" id="f-hora"></div>
+      <div class="form-group">
+        <label>Sede <span class="req">*</span></label>
+        <select id="f-sede"><option>Saavedra</option><option>Pombo</option><option>Las Heras</option><option>Talcahuano</option><option>Ballester</option><option>San Isidro</option><option>Belgrano</option><option>Carabobo</option></select>
+      </div>
+      <div class="form-group">
+        <label>Servicio / Sector <span class="req">*</span></label>
+        <select id="f-servicio">
+          <option>Guardia</option><option>Internación</option><option>Facturación</option><option>Enfermería</option>
+          <option>Cirugía</option><option>Clínica Médica</option><option>Pediatría</option><option>Obstetricia</option>
+          <option>Admisión</option><option>Farmacia</option><option>Laboratorio</option><option>Diagnóstico por Imágenes</option><option>Otro</option>
+        </select>
+      </div>
+
+      <div class="form-section-divider"><span>📌 Tipo y Clasificación</span></div>
+      <div class="form-group">
+        <label>Tipo de Presentación <span class="req">*</span></label>
+        <select id="f-tipo"><option>Queja / Reclamo</option><option>Sugerencia</option><option>Felicitación</option><option>Denuncia</option><option>Caso Crítico</option></select>
+      </div>
+      <div class="form-group">
+        <label>Clasificación / Motivo <span class="req">*</span></label>
+        <select id="f-motivo">
+          <option>Demora / acceso</option><option>Facturación / cobertura</option><option>Trato / comunicación</option>
+          <option>Seguridad del paciente</option><option>Infraestructura</option><option>Medicación</option>
+          <option>Información / documentación</option><option>Proceso clínico</option><option>Otro</option>
+        </select>
+      </div>
+
+      <div class="form-section-divider"><span>👤 Datos del Presentante</span></div>
+      <div class="form-group"><label>Apellido <span class="req">*</span></label><input type="text" id="f-apellido" placeholder="García"></div>
+      <div class="form-group"><label>Nombre <span class="req">*</span></label><input type="text" id="f-nombre" placeholder="María"></div>
+      <div class="form-group"><label>DNI <span class="req">*</span></label><input type="text" id="f-dni" placeholder="12345678"></div>
+      <div class="form-group"><label>Mail del Presentante</label><input type="email" id="f-mail-presentante" placeholder="mail@ejemplo.com"></div>
+      <div class="form-group"><label>Teléfono</label><input type="text" id="f-telefono" placeholder="11-1234-5678"></div>
+
+      <div class="form-section-divider"><span>⚙️ Gestión y Seguimiento</span></div>
+      <div class="form-group">
+        <label>Nivel de Criticidad <span class="req">*</span></label>
+        <select id="f-criticidad"><option>Baja</option><option>Media</option><option>Alta</option><option>Crítica</option></select>
+      </div>
+      <div class="form-group"><label>Responsable Asignado <span class="req">*</span></label><input type="text" id="f-responsable" placeholder="Dr. Pérez"></div>
+      <div class="form-group"><label>Email del Responsable <span class="req">*</span></label><input type="email" id="f-responsable-email" placeholder="dr.perez@cemic.com"></div>
+      <div class="form-group">
+        <label>Estado del Caso <span class="req">*</span></label>
+        <select id="f-estado"><option>Pendiente</option><option>Derivado a Responsable</option><option>Respuesta del Responsable</option><option>Cerrado</option></select>
+      </div>
+      <input type="hidden" id="f-estado-hidden">
+      <div class="form-group"><label>Fecha Límite Respuesta</label><input type="date" id="f-vencimiento"></div>
+
+      <div class="form-section-divider"><span>📝 Detalle del Caso</span></div>
+      <div class="form-group full"><label>Relato del Hecho <span class="req">*</span></label><textarea id="f-relato" placeholder="Descripción del caso..."></textarea></div>
+      <div class="form-group full"><label>Respuesta al Presentante</label><textarea id="f-respuesta" placeholder="Cargado por el responsable..." style="min-height:70px;background:#f9fafb;color:var(--text-muted);cursor:not-allowed" readonly></textarea></div>
+      <div class="form-group full"><label>Acción Correctiva</label><textarea id="f-accion" placeholder="Cargado por el responsable..." style="min-height:60px;background:#f9fafb;color:var(--text-muted);cursor:not-allowed" readonly></textarea></div>
+    </div>
+    <div id="modal-validation-msg">⚠️ Completá todos los campos obligatorios marcados con <strong>*</strong></div>
+    <div class="modal-actions">
+      <button class="btn btn-outline" onclick="closeModal()">Cancelar</button>
+      <button class="btn" onclick="saveCase()">Guardar Caso</button>
+    </div>
+  </div>
+</div>
+
+<script>
+// ─── USUARIOS ──────────────────────────────────────────────
+// Los usuarios se identifican dinámicamente por el email cargado en cada caso.
+// Admin: admin@cemic.com / 1234
+// Responsables: su email cargado en el caso / 1234
+var SESSION_KEY = 'cemic_session_v1';
+var STORAGE_KEY = 'cemic_quejas_v3';
+
+// ─── FIREBASE ──────────────────────────────────────────────
+var firebaseConfig = {
+  apiKey: "AIzaSyBqQGuzCbkZKRZ8h3P43EBpxnH5OrLr6Vs",
+  authDomain: "quejas-7261b.firebaseapp.com",
+  projectId: "quejas-7261b",
+  storageBucket: "quejas-7261b.firebasestorage.app",
+  messagingSenderId: "878965406600",
+  appId: "1:878965406600:web:ad112cc01410c8ad35d83d"
+};
+firebase.initializeApp(firebaseConfig);
+var db = firebase.firestore();
+var casosRef = db.collection('casos');
+
+var currentUser = null;
+
+// ─── FUNCIONES BASE (declaradas primero) ───────────────────
+function refresh() { updateKPIs(); updateCharts(); renderTabla(); }
+function updateTimestamp() {
+  var now = new Date();
+  document.getElementById('last-update').textContent = now.toLocaleDateString('es-AR')+' '+now.toLocaleTimeString('es-AR',{hour:'2-digit',minute:'2-digit'});
+}
+function saveData() { /* Firebase: los datos se guardan con saveCaso() */ }
+function loadData(callback) {
+  casosRef.orderBy('id').get().then(function(snapshot) {
+    data = [];
+    snapshot.forEach(function(doc) { data.push(doc.data()); });
+    if (data.length === 0) {
+      var batch = db.batch();
+      initialData.forEach(function(caso) { batch.set(casosRef.doc(String(caso.id)), caso); });
+      batch.commit().then(function() { data = initialData.slice(); if(callback) callback(); });
+    } else { if(callback) callback(); }
+  }).catch(function(e) { data = initialData.slice(); if(callback) callback(); });
+}
+function saveCaso(caso) { casosRef.doc(String(caso.id)).set(caso); }
+function deleteCaso(id) { casosRef.doc(String(id)).delete(); }
+function startRealtimeListener() {
+  casosRef.orderBy('id').onSnapshot(function(snapshot) {
+    data = [];
+    snapshot.forEach(function(doc) { data.push(doc.data()); });
+    if (currentUser) {
+      if (currentUser.rol === 'admin' || currentUser.rol === 'readonly') { refresh(); updateTimestamp(); }
+      else { renderUserView(); }
+    }
+  });
+}
+
+function doLogin() {
+  const email = document.getElementById('login-email').value.trim().toLowerCase();
+  const pass  = document.getElementById('login-pass').value;
+  const PASS_KEY = 'cemic_passwords_v1';
+  let passwords = {};
+  try { passwords = JSON.parse(localStorage.getItem(PASS_KEY)||'{}'); } catch(e){}
+
+  // Admin hardcodeado
+  if (email === 'admin@cemic.com') {
+    const adminPass = passwords['admin@cemic.com'] || '1234';
+    if (pass !== adminPass) { document.getElementById('login-error').classList.add('show'); return; }
+    currentUser = { email: 'admin@cemic.com', nombre: 'Administrador', rol: 'admin' };
+    localStorage.setItem(SESSION_KEY, JSON.stringify(currentUser));
+    document.getElementById('login-error').classList.remove('show');
+    showApp();
+    return;
+  }
+
+  // Usuario tablero (solo lectura)
+  if (email === 'tablero@cemic.com') {
+    const tableroPass = passwords['tablero@cemic.com'] || '1234';
+    if (pass !== tableroPass) { document.getElementById('login-error').classList.add('show'); return; }
+    currentUser = { email: 'tablero@cemic.com', nombre: 'Tablero', rol: 'readonly' };
+    localStorage.setItem(SESSION_KEY, JSON.stringify(currentUser));
+    document.getElementById('login-error').classList.remove('show');
+    showApp();
+    return;
+  }
+  let casos = [];
+  try { const s = localStorage.getItem(STORAGE_KEY); if (s) casos = JSON.parse(s); } catch(e) {}
+
+  // Si no hay datos en localStorage, buscar en initialData (ya declarado más arriba no disponible aquí)
+  // Permitir login con contraseña correcta aunque no haya casos asignados aún
+  const caso = casos.find(d => (d.responsable_email || '').toLowerCase() === email);
+  // Si no encontramos el email en casos, igual permitir login si la contraseña es correcta
+  // (el responsable verá pantalla vacía)
+  const userPass = passwords[email] || '1234';
+  if (pass !== userPass) { document.getElementById('login-error').classList.add('show'); return; }
+
+  currentUser = { email, nombre: (caso && caso.responsable) || email, rol: 'usuario' };
+  localStorage.setItem(SESSION_KEY, JSON.stringify(currentUser));
+  document.getElementById('login-error').classList.remove('show');
+  showApp();
+}
+
+document.getElementById('login-pass').addEventListener('keydown', function(e){ if(e.key==='Enter') doLogin(); });
+document.getElementById('login-email').addEventListener('keydown', function(e){ if(e.key==='Enter') document.getElementById('login-pass').focus(); });
+
+function doLogout() {
+  currentUser = null;
+  localStorage.removeItem(SESSION_KEY);
+  document.getElementById('login-screen').classList.remove('hidden');
+  document.getElementById('login-email').value = '';
+  document.getElementById('login-pass').value  = '';
+  document.querySelector('main').style.display  = 'none';
+  document.getElementById('user-view').classList.remove('active');
+}
+
+function showApp() {
+  document.getElementById('login-screen').classList.add('hidden');
+  // Actualizar user bar en header
+  document.getElementById('user-display-name').textContent = currentUser.nombre;
+  document.getElementById('user-display-role').textContent = currentUser.rol === 'admin' ? 'Administrador' : currentUser.rol === 'readonly' ? 'Solo Lectura' : 'Usuario';
+  const initials = currentUser.nombre.split(' ').map(w=>w[0]).join('').slice(0,2).toUpperCase();
+  document.getElementById('user-avatar').textContent = initials;
+
+  if (currentUser.rol === 'admin' || currentUser.rol === 'readonly') {
+    document.querySelector('main').style.display = 'block';
+    document.getElementById('user-view').classList.remove('active');
+    // Si es readonly, ocultar botones de acción
+    if (currentUser.rol === 'readonly') {
+      document.getElementById('btn-nuevo-caso') && (document.getElementById('btn-nuevo-caso').style.display = 'none');
+    }
+    loadData(function() { refresh(); updateTimestamp(); startRealtimeListener(); });
+  } else {
+    document.querySelector('main').style.display = 'none';
+    document.getElementById('user-view').classList.add('active');
+    loadData(function() { renderUserView(); updateTimestamp(); startRealtimeListener(); });
+  }
+}
+
+function renderUserView() {
+  const nombre = currentUser.nombre;
+  document.getElementById('user-welcome-title').textContent = `Hola, ${nombre} 👋`;
+
+  // Casos asignados: match exacto por email del responsable
+  const myCases = data.filter(d =>
+    (d.responsable_email || '').toLowerCase() === currentUser.email.toLowerCase()
+  );
+
+  // Stats bar
+  const pending   = myCases.filter(d => d.estado === 'Pendiente').length;
+  const derivado  = myCases.filter(d => d.estado === 'Derivado a Responsable').length;
+  const respondido = myCases.filter(d => d.estado === 'Respuesta del Responsable').length;
+  const closed    = myCases.filter(d => d.estado === 'Cerrado').length;
+  document.getElementById('user-stats-bar').innerHTML = `
+    <div class="user-stat"><div class="user-stat-num">${myCases.length}</div><div class="user-stat-label">Total asignados</div></div>
+    <div class="user-stat" style="border-top-color:#9ca3af"><div class="user-stat-num">${pending}</div><div class="user-stat-label">Pendientes</div></div>
+    <div class="user-stat" style="border-top-color:#2563eb"><div class="user-stat-num">${derivado}</div><div class="user-stat-label">Derivados</div></div>
+    <div class="user-stat" style="border-top-color:#7c3aed"><div class="user-stat-num">${respondido}</div><div class="user-stat-label">Con respuesta</div></div>
+    <div class="user-stat" style="border-top-color:var(--green-main)"><div class="user-stat-num">${closed}</div><div class="user-stat-label">Cerrados</div></div>
+  `;
+
+  if (myCases.length === 0) {
+    document.getElementById('user-cases-list').innerHTML = `<div class="user-empty"><div class="user-empty-icon">📭</div><div>No tenés casos asignados aún.</div></div>`;
+    return;
+  }
+
+  const tipoMap = {' Queja / Reclamo':'quejareclamo','Sugerencia':'sugerencia','Felicitación':'felicitacion','Denuncia':'denuncia','Caso Crítico':'casocritico','Queja / Reclamo':'quejareclamo'};
+  document.getElementById('user-cases-list').innerHTML = myCases.map(d => {
+    const tipoClass = tipoMap[d.tipo] || 'quejareclamo';
+    const v = isVencido(d.vencimiento, d.estado);
+    const respGuardada = d.respuesta || '';
+    const accionGuardada = d.accion || '';
+    const estadoResp = d.estado_respuesta || 'Pendiente';
+    return `
+    <div class="case-card ${tipoClass}" id="case-card-${d.id}">
+      <div class="case-card-header">
+        <span class="case-card-id">#${d.id}</span>
+        <span class="${getBadgeClass(d.tipo)}">${d.tipo}</span>
+        <span class="status-badge" style="background:${getBgStatus(d.estado)};color:${getColorStatus(d.estado)}">${d.estado}</span>
+        <span class="crit-badge ${(d.criticidad||'').replace('é','e').replace('í','i')}">${d.criticidad||'—'}</span>
+        <span class="case-card-meta">${d.servicio||'—'} · ${d.sede||'—'} · ${d.fecha||'—'}${v?' ⚠️ Vencido':''}</span>
+      </div>
+      <div class="case-card-body">
+        <div class="case-relato-label">Paciente</div>
+        <div style="font-size:0.84rem;margin-bottom:4px;font-weight:600">${d.apellido||''} ${d.nombre||''}</div>
+        ${d.dni?`<div style="font-size:0.78rem;color:var(--text-muted);margin-bottom:4px">DNI: ${d.dni}${d.telefono?' · Tel: '+d.telefono:''}</div>`:''}
+        <div class="case-relato-label" style="margin-top:8px">Motivo</div>
+        <div style="font-size:0.82rem;color:var(--text-muted);margin-bottom:10px">${d.motivo||'—'}</div>
+        <div class="case-relato-label">Relato del hecho</div>
+        <div class="case-relato">${d.relato||'Sin relato registrado.'}</div>
+        <div class="case-respuesta">
+          ${respGuardada ? `<div class="resp-history"><div class="resp-history-label">✅ Respuesta registrada</div>${respGuardada}</div>` : ''}
+          ${accionGuardada ? `<div class="resp-history" style="background:#fffbeb;border-color:#fde68a"><div class="resp-history-label" style="color:#92400e">🔧 Acción correctiva registrada</div>${accionGuardada}</div>` : ''}
+          <div class="case-relato-label" style="margin-top:14px">Respuesta al Presentante</div>
+          <textarea id="resp-${d.id}" placeholder="Escribí la respuesta al paciente/presentante...">${respGuardada}</textarea>
+          <div class="case-relato-label" style="margin-top:10px">Acción Correctiva</div>
+          <textarea id="accion-${d.id}" placeholder="Describí la acción correctiva interna...">${accionGuardada}</textarea>
+          <div class="case-respuesta-actions">
+            <button class="btn" style="font-size:0.8rem;padding:7px 16px" onclick="saveUserResp(${d.id})">💾 Guardar respuesta</button>
+            <select id="estado-resp-${d.id}" class="resp-estado-select ${estadoResp==='Respuesta enviada'?'resp-estado-enviada':'resp-estado-pendiente'}">
+              <option value="Pendiente" ${estadoResp==='Pendiente'?'selected':''}>Pendiente</option>
+              <option value="Respuesta enviada" ${estadoResp==='Respuesta enviada'?'selected':''}>Respuesta enviada</option>
+            </select>
+            ${d.estado === 'Cerrado' ? `<span style="padding:5px 12px;border-radius:7px;font-size:0.78rem;font-weight:600;background:#d1fae5;color:#065f46">✅ Cerrado</span>` : ''}
+            <span class="respuesta-saved" id="saved-${d.id}">¡Guardado!</span>
+          </div>
+        </div>
+      </div>
+    </div>`;
+  }).join('');
+}
+
+function saveUserResp(id) {
+  const respuesta = document.getElementById(`resp-${id}`).value;
+  const accion = document.getElementById(`accion-${id}`).value;
+  const idx = data.findIndex(x => x.id === id);
+  if (idx !== -1) {
+    data[idx].respuesta = respuesta;
+    data[idx].accion = accion;
+    // Si hay respuesta o acción → cambiar estado del caso a "Respuesta del Responsable"
+    const nuevoEstado = (respuesta.trim() || accion.trim()) ? 'Respuesta enviada' : 'Pendiente';
+    data[idx].estado_respuesta = nuevoEstado;
+    if (respuesta.trim() || accion.trim()) {
+      data[idx].estado = 'Respuesta del Responsable';
+    }
+    // Actualizar el select visualmente
+    const sel = document.getElementById(`estado-resp-${id}`);
+    sel.value = nuevoEstado;
+    sel.className = 'resp-estado-select ' + (nuevoEstado === 'Respuesta enviada' ? 'resp-estado-enviada' : 'resp-estado-pendiente');
+    saveCaso(data[idx]);
+    const s = document.getElementById(`saved-${id}`);
+    s.classList.add('show');
+    setTimeout(() => s.classList.remove('show'), 2000);
+    const myCases = data.filter(d =>
+      (d.responsable_email || '').toLowerCase() === currentUser.email.toLowerCase()
+    );
+    const pending   = myCases.filter(d => d.estado === 'Pendiente').length;
+    const derivado  = myCases.filter(d => d.estado === 'Derivado a Responsable').length;
+    const respondido = myCases.filter(d => d.estado === 'Respuesta del Responsable').length;
+    const closed    = myCases.filter(d => d.estado === 'Cerrado').length;
+    document.getElementById('user-stats-bar').innerHTML = `
+      <div class="user-stat"><div class="user-stat-num">${myCases.length}</div><div class="user-stat-label">Total asignados</div></div>
+      <div class="user-stat" style="border-top-color:#9ca3af"><div class="user-stat-num">${pending}</div><div class="user-stat-label">Pendientes</div></div>
+      <div class="user-stat" style="border-top-color:#2563eb"><div class="user-stat-num">${derivado}</div><div class="user-stat-label">Derivados</div></div>
+      <div class="user-stat" style="border-top-color:#7c3aed"><div class="user-stat-num">${respondido}</div><div class="user-stat-label">Con respuesta</div></div>
+      <div class="user-stat" style="border-top-color:var(--green-main)"><div class="user-stat-num">${closed}</div><div class="user-stat-label">Cerrados</div></div>
+    `;
+  }
+}
+
+// STORAGE_KEY declarado arriba
+
+var initialData = [
+  { id:1, fecha:'2025-04-10', hora:'09:30', sede:'Saavedra', servicio:'Guardia', tipo:'Queja / Reclamo', apellido:'García', nombre:'María', motivo:'Demora / acceso', criticidad:'Media', responsable:'Dr. Pérez', responsable_email:'dr.perez@cemic.com', estado:'Derivado a Responsable', vencimiento:'2025-04-17', relato:'Esperé más de 3 horas sin recibir atención.', respuesta:'', accion:'' },
+  { id:2, fecha:'2025-04-11', hora:'14:00', sede:'Pombo', servicio:'Facturación', tipo:'Denuncia', apellido:'López', nombre:'Carlos', motivo:'Facturación / cobertura', criticidad:'Alta', responsable:'Lic. Romero', responsable_email:'lic.romero@cemic.com', estado:'Derivado a Responsable', vencimiento:'2025-04-13', relato:'Me facturaron una práctica que no me realizaron.', respuesta:'', accion:'' },
+  { id:3, fecha:'2025-04-12', hora:'11:15', sede:'Las Heras', servicio:'Internación', tipo:'Felicitación', apellido:'Martínez', nombre:'Ana', motivo:'Trato / comunicación', criticidad:'Baja', responsable:'Enf. Torres', responsable_email:'enf.torres@cemic.com', estado:'Cerrado', vencimiento:'2025-04-19', relato:'Excelente trato del equipo de enfermería.', respuesta:'Muchas gracias por su comentario.', accion:'Reconocimiento al equipo' },
+  { id:4, fecha:'2025-04-14', hora:'08:00', sede:'Belgrano', servicio:'Pediatría', tipo:'Queja / Reclamo', apellido:'Sánchez', nombre:'Jorge', motivo:'Demora / acceso', criticidad:'Alta', responsable:'Dr. Lima', responsable_email:'dr.lima@cemic.com', estado:'Pendiente', vencimiento:'2025-04-21', relato:'Turno reprogramado tres veces sin aviso.', respuesta:'', accion:'' },
+  { id:5, fecha:'2025-04-15', hora:'16:45', sede:'Talcahuano', servicio:'Farmacia', tipo:'Caso Crítico', apellido:'Díaz', nombre:'Laura', motivo:'Medicación', criticidad:'Crítica', responsable:'Farm. Ruiz', responsable_email:'farm.ruiz@cemic.com', estado:'Derivado a Responsable', vencimiento:'2025-04-16', relato:'Error en la entrega de medicación a paciente internado.', respuesta:'', accion:'' }
+];
+
+var data = [];
+var editingId = null;
+
+// loadData y saveData declarados al inicio del script
+
+// Restore session on load - siempre mostrar login al abrir el archivo
+(function checkSession(){
+  localStorage.removeItem(SESSION_KEY);
+  currentUser = null;
+  // Limpiar datos corruptos del localStorage
+  try {
+    const s = localStorage.getItem(STORAGE_KEY);
+    if (s) {
+      const parsed = JSON.parse(s);
+      if (!Array.isArray(parsed) || parsed.length === 0) {
+        localStorage.removeItem(STORAGE_KEY);
+      }
+    }
+  } catch(e) { localStorage.removeItem(STORAGE_KEY); }
+})();
+
+// ─── KPIs ──────────────────────────────────────────────────
+function updateKPIs() {
+  const total = data.length;
+  const counts = { 'Queja / Reclamo':0, Sugerencia:0, 'Felicitación':0, Denuncia:0, 'Caso Crítico':0 };
+  data.forEach(d => { if (counts[d.tipo] !== undefined) counts[d.tipo]++; });
+  document.getElementById('kpi-total').textContent = total;
+  document.getElementById('kpi-total-sub').textContent = `caso${total !== 1?'s':''} registrado${total !== 1?'s':''}`;
+  const pct = v => total > 0 ? ((v/total)*100).toFixed(0)+' %' : '—';
+  document.getElementById('kpi-quejas').textContent = counts['Queja / Reclamo'];
+  document.getElementById('kpi-quejas-pct').textContent = pct(counts['Queja / Reclamo']);
+  document.getElementById('kpi-reclamos').textContent = counts['Caso Crítico'];
+  document.getElementById('kpi-reclamos-pct').textContent = pct(counts['Caso Crítico']);
+  document.getElementById('kpi-felicitaciones').textContent = counts['Felicitación'];
+  document.getElementById('kpi-felicitaciones-pct').textContent = pct(counts['Felicitación']);
+  document.getElementById('kpi-sugerencias').textContent = counts['Sugerencia'];
+  document.getElementById('kpi-sugerencias-pct').textContent = pct(counts['Sugerencia']);
+  const criticos = data.filter(d => (d.criticidad === 'Crítica' || d.tipo === 'Caso Crítico') && d.estado !== 'Cerrado');
+  const bar = document.getElementById('alertCritica');
+  if (criticos.length > 0) {
+    bar.classList.remove('hidden');
+    document.getElementById('alertCriticaMsg').textContent = `⚠️ Atención: ${criticos.length} caso${criticos.length>1?'s':''} de criticidad CRÍTICA requieren escalamiento inmediato a Dirección.`;
+  } else { bar.classList.add('hidden'); }
+}
+
+// ─── CHARTS ───────────────────────────────────────────────
+var TIPO_COLORS = { 'Queja / Reclamo':'#b45309','Sugerencia':'#0e7a4e','Felicitación':'#1d6d3b','Denuncia':'#7c3aed','Caso Crítico':'#991b1b' };
+var STATUS_COLORS = { 'Cerrado':'#1e7a44','Derivado a Responsable':'#2563eb','Respuesta del Responsable':'#7c3aed','Pendiente':'#9ca3af' };
+
+function drawPie(entries, total) {
+  const svg = document.getElementById('pie-svg');
+  svg.querySelectorAll('.pie-slice').forEach(el => el.remove());
+  document.getElementById('pie-center-num').textContent = total;
+  if (total === 0) return;
+  const cx=80, cy=80, r=55, hole=30;
+  let start = -Math.PI/2;
+  entries.forEach(([tipo, cnt]) => {
+    const angle = (cnt/total)*2*Math.PI;
+    const end = start + angle;
+    const x1=cx+r*Math.cos(start), y1=cy+r*Math.sin(start);
+    const x2=cx+r*Math.cos(end),   y2=cy+r*Math.sin(end);
+    const hx1=cx+hole*Math.cos(start), hy1=cy+hole*Math.sin(start);
+    const hx2=cx+hole*Math.cos(end),   hy2=cy+hole*Math.sin(end);
+    const lg = angle > Math.PI ? 1 : 0;
+    const path = document.createElementNS('http://www.w3.org/2000/svg','path');
+    path.setAttribute('d', `M${hx1} ${hy1} L${x1} ${y1} A${r} ${r} 0 ${lg} 1 ${x2} ${y2} L${hx2} ${hy2} A${hole} ${hole} 0 ${lg} 0 ${hx1} ${hy1}Z`);
+    path.setAttribute('fill', TIPO_COLORS[tipo]||'#999');
+    path.setAttribute('stroke','#fff'); path.setAttribute('stroke-width','2');
+    path.classList.add('pie-slice');
+    svg.insertBefore(path, svg.querySelector('text'));
+    start = end;
+  });
+}
+
+function updateCharts() {
+  const total = data.length;
+  // Torta tipos
+  const tipoCounts = {};
+  data.forEach(d => { tipoCounts[d.tipo] = (tipoCounts[d.tipo]||0)+1; });
+  const tipoEntries = Object.entries(tipoCounts).sort((a,b)=>b[1]-a[1]);
+  drawPie(tipoEntries, total);
+  const legend = document.getElementById('pie-legend');
+  legend.innerHTML = tipoEntries.length ? tipoEntries.map(([tipo,cnt]) => `
+    <div class="pie-legend-item">
+      <div class="pie-legend-dot" style="background:${TIPO_COLORS[tipo]||'#999'}"></div>
+      <span class="pie-legend-name">${tipo}</span>
+      <span class="pie-legend-val">${cnt}</span>
+      <span class="pie-legend-pct">${total>0?((cnt/total)*100).toFixed(0):0}%</span>
+    </div>`).join('') : '<div class="empty-state" style="padding:8px 0">Sin datos</div>';
+
+  // Estados
+  const ec = { Cerrado:0,'Derivado a Responsable':0,'Respuesta del Responsable':0,Pendiente:0 };
+  data.forEach(d => { if (ec[d.estado]!==undefined) ec[d.estado]++; });
+  const estadoEl = document.getElementById('chart-estados');
+  estadoEl.innerHTML = total===0 ? '<div class="empty-state">Sin datos aún</div>' :
+    Object.entries(ec).sort((a,b)=>b[1]-a[1]).map(([est,cnt]) => `
+      <div class="status-item">
+        <span class="status-dot" style="background:${STATUS_COLORS[est]||'#999'}"></span>
+        <span class="status-name">${est}</span>
+        <span class="status-count">${cnt}</span>
+        <span class="status-pct">${total>0?((cnt/total)*100).toFixed(0):0}%</span>
+      </div>`).join('');
+
+  // Criticidad
+  const crit = {'Crítica':0,Alta:0,Media:0,Baja:0};
+  data.forEach(d => { if(crit[d.criticidad]!==undefined) crit[d.criticidad]++; });
+  document.getElementById('c-critica').textContent = crit['Crítica'];
+  document.getElementById('c-alta').textContent = crit['Alta'];
+  document.getElementById('c-media').textContent = crit['Media'];
+  document.getElementById('c-baja').textContent = crit['Baja'];
+
+  // Sectores
+  const sc = {};
+  data.forEach(d => { sc[d.servicio]=(sc[d.servicio]||0)+1; });
+  const ss = Object.entries(sc).sort((a,b)=>b[1]-a[1]).slice(0,7);
+  const maxS = ss.length ? ss[0][1] : 1;
+  document.getElementById('chart-sectores').innerHTML = ss.length===0 ? '<div class="empty-state">Sin datos aún</div>' :
+    ss.map(([sec,cnt]) => `
+      <div class="bar-row">
+        <div class="bar-label">${sec}</div>
+        <div class="bar-track"><div class="bar-fill" style="width:${(cnt/maxS*100).toFixed(1)}%;background:var(--green-main)">${cnt>1?cnt:''}</div></div>
+        <div style="font-size:0.78rem;width:28px;text-align:right;color:var(--text-muted)">${cnt}</div>
+      </div>`).join('');
+}
+
+// ─── TABLA ─────────────────────────────────────────────────
+function getBadgeClass(tipo) {
+  const m={'Queja / Reclamo':'quejareclamo','Sugerencia':'sugerencia','Felicitación':'felicitacion','Denuncia':'denuncia','Caso Crítico':'casocritico'};
+  return 'badge badge-'+(m[tipo]||'quejareclamo');
+}
+function isVencido(fecha,estado) { return !(!fecha||estado==='Cerrado') && new Date(fecha)<new Date(); }
+function getBgStatus(s) { return ({'Cerrado':'#d1fae5','Derivado a Responsable':'#dbeafe','Respuesta del Responsable':'#f5f3ff','Pendiente':'#f3f4f6'})[s]||'#f3f4f6'; }
+function getColorStatus(s) { return ({'Cerrado':'#065f46','Derivado a Responsable':'#1e40af','Respuesta del Responsable':'#6d28d9','Pendiente':'#6b7280'})[s]||'#6b7280'; }
+
+function getActiveFilters() {
+  return ['search-input','filter-sede','filter-servicio','filter-tipo','filter-estado','filter-criticidad','filter-motivo','filter-fecha-desde','filter-fecha-hasta','filter-vencimiento']
+    .filter(id => document.getElementById(id) && document.getElementById(id).value.trim() !== '').length;
+}
+
+function renderTabla() {
+  const search  = document.getElementById('search-input').value.toLowerCase();
+  const fSede   = document.getElementById('filter-sede').value;
+  const fServ   = document.getElementById('filter-servicio').value;
+  const fTipo   = document.getElementById('filter-tipo').value;
+  const fEstado = document.getElementById('filter-estado').value;
+  const fCrit   = document.getElementById('filter-criticidad').value;
+  const fMotivo = document.getElementById('filter-motivo').value;
+  const fDesde  = document.getElementById('filter-fecha-desde').value;
+  const fHasta  = document.getElementById('filter-fecha-hasta').value;
+  const fVenc   = document.getElementById('filter-vencimiento') ? document.getElementById('filter-vencimiento').value : '';
+
+  const hoy = new Date(); hoy.setHours(0,0,0,0);
+  const en48 = new Date(hoy); en48.setDate(en48.getDate() + 2);
+
+  const filtered = data.filter(d => {
+    const ms = !search || [d.apellido,d.nombre,d.servicio,d.motivo,d.responsable,d.sede,d.relato,String(d.id)].some(v => (v||'').toLowerCase().includes(search));
+    let vencOk = true;
+    if (fVenc && d.vencimiento && d.estado !== 'Cerrado') {
+      const vDate = new Date(d.vencimiento + 'T00:00:00');
+      if (fVenc === 'vencido') vencOk = vDate < hoy;
+      if (fVenc === '48hs') vencOk = vDate >= hoy && vDate <= en48;
+    } else if (fVenc) {
+      vencOk = false;
+    }
+    return ms && vencOk
+      && (!fSede   || d.sede === fSede)
+      && (!fServ   || d.servicio === fServ)
+      && (!fTipo   || d.tipo === fTipo)
+      && (!fEstado || d.estado === fEstado)
+      && (!fCrit   || d.criticidad === fCrit)
+      && (!fMotivo || d.motivo === fMotivo)
+      && (!fDesde  || (d.fecha && d.fecha >= fDesde))
+      && (!fHasta  || (d.fecha && d.fecha <= fHasta));
+  });
+
+  document.getElementById('tabla-count').textContent = `${filtered.length} caso${filtered.length!==1?'s':''}`;
+  const n = getActiveFilters();
+  const badge = document.getElementById('filter-active-count');
+  badge.textContent = `${n} filtro${n>1?'s':''} activo${n>1?'s':''}`;
+  badge.style.display = n > 0 ? 'inline' : 'none';
+
+  const tbody = document.getElementById('tabla-body');
+  if (filtered.length === 0) { tbody.innerHTML='<tr><td colspan="12" class="empty-state">No se encontraron casos</td></tr>'; return; }
+  tbody.innerHTML = filtered.map(d => {
+    const v = isVencido(d.vencimiento, d.estado);
+    const ck = (d.criticidad||'').replace('é','e').replace('í','i');
+    const relatoEsc = (d.relato||'').replace(/'/g,"&#39;").replace(/"/g,'&quot;');
+    const respEsc = (d.respuesta||'').replace(/'/g,"&#39;").replace(/"/g,'&quot;');
+    const accionEsc = (d.accion||'').replace(/'/g,"&#39;").replace(/"/g,'&quot;');
+    return `<tr class="caso-row" onclick="toggleDetalle(${d.id})" style="cursor:pointer">
+      <td><strong>#${d.id}</strong></td>
+      <td style="font-size:0.78rem;white-space:nowrap">${d.fecha||'—'}</td>
+      <td style="font-size:0.78rem"><strong>${d.sede||'—'}</strong><br><span style="color:var(--text-muted);font-size:0.72rem">${d.servicio||''}</span></td>
+      <td><span class="${getBadgeClass(d.tipo)}" style="font-size:0.68rem;padding:2px 6px">${d.tipo}</span></td>
+      <td style="font-size:0.78rem">${d.apellido||''} ${d.nombre||''}</td>
+      <td><span class="crit-badge ${ck}" style="font-size:0.7rem">${d.criticidad||'—'}</span></td>
+      <td style="font-size:0.76rem" title="${d.responsable_email||''}">${d.responsable||'—'}</td>
+      <td><span style="background:${getBgStatus(d.estado)};color:${getColorStatus(d.estado)};border-radius:6px;padding:3px 7px;font-size:0.7rem;font-weight:600;white-space:nowrap">${d.estado||'—'}</span></td>
+      <td style="font-size:0.75rem;white-space:nowrap" class="${v?'vencido':''}">${d.vencimiento||'—'}${v?' ⚠️':''}</td>
+      <td style="white-space:nowrap" onclick="event.stopPropagation()">
+        ${currentUser.rol !== 'readonly' ? `
+        <button class="btn btn-outline" style="padding:3px 8px;font-size:0.7rem" onclick="editCase(${d.id})">✏️</button>
+        <button class="btn btn-danger" style="padding:3px 8px;font-size:0.7rem;margin-left:3px" onclick="deleteCase(${d.id})">🗑</button>
+        ` : '—'}
+      </td>
+    </tr>
+    <tr class="detalle-row" id="detalle-${d.id}" style="display:none">
+      <td colspan="10" style="padding:0">
+        <div class="detalle-panel">
+          <div class="detalle-grid">
+            <div>
+              <div class="detalle-label">👤 Paciente</div>
+              <div class="detalle-val"><strong>${d.apellido||''} ${d.nombre||''}</strong>${d.dni?' · DNI: '+d.dni:''}${d.telefono?' · Tel: '+d.telefono:''}</div>
+              ${d.mail_presentante?`<div class="detalle-val" style="font-size:0.78rem;color:var(--text-muted)">${d.mail_presentante}</div>`:''}
+            </div>
+            <div>
+              <div class="detalle-label">📋 Relato del Hecho</div>
+              <div class="detalle-val detalle-relato">${d.relato||'Sin relato registrado.'}</div>
+            </div>
+            ${respEsc||accionEsc ? `
+            <div>
+              <div class="detalle-label">💬 Respuesta al Presentante</div>
+              <div class="detalle-val detalle-relato">${d.respuesta||'—'}</div>
+            </div>
+            <div>
+              <div class="detalle-label">🔧 Acción Correctiva</div>
+              <div class="detalle-val detalle-relato">${d.accion||'—'}</div>
+            </div>` : ''}
+          </div>
+        </div>
+      </td>
+    </tr>`;
+  }).join('');
+}
+
+function toggleDetalle(id) {
+  const row = document.getElementById('detalle-' + id);
+  if (!row) return;
+  const isOpen = row.style.display !== 'none';
+  // Cerrar todos los detalles abiertos
+  document.querySelectorAll('.detalle-row').forEach(function(r) { r.style.display = 'none'; });
+  document.querySelectorAll('.caso-row').forEach(function(r) { r.classList.remove('caso-row-active'); });
+  if (!isOpen) {
+    row.style.display = 'table-row';
+    row.previousElementSibling.classList.add('caso-row-active');
+  }
+}
+
+// ─── TABS ──────────────────────────────────────────────────
+function switchTab(tab) {
+  document.querySelectorAll('.tab-content').forEach(function(el) { el.classList.remove('active'); });
+  document.querySelectorAll('.tab-btn').forEach(function(el) { el.classList.remove('active'); });
+  document.getElementById('tab-' + tab).classList.add('active');
+  document.querySelectorAll('.tab-btn').forEach(function(el) {
+    if (el.textContent.toLowerCase().includes(tab === 'casos' ? 'casos' : 'tablero')) el.classList.add('active');
+  });
+}
+
+function syncFilters() {
+  // Copiar filtros del tablero a los filtros de casos
+  var pairs = [
+    ['t-search-input','search-input'],
+    ['t-filter-sede','filter-sede'],
+    ['t-filter-tipo','filter-tipo'],
+    ['t-filter-estado','filter-estado'],
+    ['t-filter-fecha-desde','filter-fecha-desde'],
+    ['t-filter-fecha-hasta','filter-fecha-hasta'],
+    ['t-filter-vencimiento','filter-vencimiento']
+  ];
+  pairs.forEach(function(p) {
+    var src = document.getElementById(p[0]);
+    var dst = document.getElementById(p[1]);
+    if (src && dst) dst.value = src.value;
+  });
+  renderTabla();
+  updateCharts();
+}
+
+function syncFiltersReverse() {
+  // Copiar filtros de casos a los del tablero
+  var pairs = [
+    ['search-input','t-search-input'],
+    ['filter-sede','t-filter-sede'],
+    ['filter-tipo','t-filter-tipo'],
+    ['filter-estado','t-filter-estado'],
+    ['filter-fecha-desde','t-filter-fecha-desde'],
+    ['filter-fecha-hasta','t-filter-fecha-hasta'],
+    ['filter-vencimiento','t-filter-vencimiento']
+  ];
+  pairs.forEach(function(p) {
+    var src = document.getElementById(p[0]);
+    var dst = document.getElementById(p[1]);
+    if (src && dst) dst.value = src.value;
+  });
+}
+
+// ─── FILTROS ───────────────────────────────────────────────
+function clearFilters() {
+  ['search-input','filter-sede','filter-servicio','filter-tipo','filter-estado','filter-criticidad','filter-motivo','filter-fecha-desde','filter-fecha-hasta','filter-vencimiento']
+    .forEach(id => { const el = document.getElementById(id); if(el) el.value=''; });
+  ['t-search-input','t-filter-sede','t-filter-tipo','t-filter-estado','t-filter-fecha-desde','t-filter-fecha-hasta','t-filter-vencimiento']
+    .forEach(id => { const el = document.getElementById(id); if(el) el.value=''; });
+  renderTabla(); updateCharts();
+}
+
+function exportarExcel() {
+  const headers = ['ID','Fecha','Hora','Sede','Servicio','Tipo','Motivo','Apellido','Nombre','DNI','Teléfono','Mail Presentante','Criticidad','Responsable','Email Responsable','Estado','Vencimiento','Relato','Respuesta','Acción Correctiva','Origen'];
+  const rows = data.map(d => [
+    d.id, d.fecha||'', d.hora||'', d.sede||'', d.servicio||'', d.tipo||'', d.motivo||'',
+    d.apellido||'', d.nombre||'', d.dni||'', d.telefono||'', d.mail_presentante||'',
+    d.criticidad||'', d.responsable||'', d.responsable_email||'', d.estado||'',
+    d.vencimiento||'', d.relato||'', d.respuesta||'', d.accion||'', d.origen||'sistema'
+  ]);
+
+  // Construir CSV con BOM para Excel
+  const BOM = '\uFEFF';
+  const csv = BOM + [headers, ...rows].map(r =>
+    r.map(v => `"${String(v).replace(/"/g,'""')}"`).join(',')
+  ).join('\r\n');
+
+  const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  const fecha = new Date().toISOString().split('T')[0];
+  a.href = url;
+  a.download = `CEMIC_Quejas_${fecha}.csv`;
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+  URL.revokeObjectURL(url);
+}
+['search-input','filter-sede','filter-servicio','filter-tipo','filter-estado','filter-criticidad','filter-motivo','filter-fecha-desde','filter-fecha-hasta','filter-vencimiento']
+  .forEach(id => {
+    const el = document.getElementById(id);
+    if (el) el.addEventListener(el.tagName==='INPUT'?'input':'change', function() { syncFiltersReverse(); renderTabla(); updateCharts(); });
+  });
+
+// ─── MODAL ─────────────────────────────────────────────────
+function openModal(id) {
+  editingId = id || null;
+  document.getElementById('modal-title').textContent = id ? '✏️ Editar Caso' : '🗂 Nuevo Caso';
+  const today = new Date().toISOString().split('T')[0];
+  const nowTime = new Date().toTimeString().slice(0,5);
+  const d = id ? data.find(x => x.id===id) : null;
+  const v = k => d ? (d[k]||'') : '';
+  document.getElementById('f-fecha').value      = d ? (d.fecha||today)    : today;
+  document.getElementById('f-hora').value       = d ? (d.hora||nowTime)   : nowTime;
+  document.getElementById('f-sede').value       = d ? (d.sede||'Saavedra') : 'Saavedra';
+  document.getElementById('f-servicio').value   = d ? (d.servicio||'Guardia') : 'Guardia';
+  document.getElementById('f-tipo').value       = d ? (d.tipo||'Queja / Reclamo')   : 'Queja / Reclamo';
+  document.getElementById('f-motivo').value     = d ? (d.motivo||'Demora / acceso') : 'Demora / acceso';
+  document.getElementById('f-apellido').value   = v('apellido');
+  document.getElementById('f-nombre').value     = v('nombre');
+  document.getElementById('f-dni').value        = v('dni');
+  document.getElementById('f-mail-presentante').value = v('mail_presentante');
+  document.getElementById('f-telefono').value   = v('telefono');
+  document.getElementById('f-criticidad').value = d ? (d.criticidad||'Baja') : 'Baja';
+  document.getElementById('f-responsable').value= v('responsable');
+  document.getElementById('f-responsable-email').value= v('responsable_email');
+  document.getElementById('f-estado').value     = d ? (d.estado||'Pendiente') : 'Pendiente';
+  document.getElementById('f-vencimiento').value= v('vencimiento');
+  document.getElementById('f-relato').value     = v('relato');
+  document.getElementById('f-respuesta').value  = v('respuesta');
+  document.getElementById('f-accion').value     = v('accion');
+  document.getElementById('modal-overlay').classList.add('active');
+}
+function closeModal() {
+  document.getElementById('modal-overlay').classList.remove('active');
+  editingId = null;
+  ['f-fecha','f-hora','f-sede','f-servicio','f-tipo','f-motivo','f-apellido','f-nombre','f-dni','f-criticidad','f-responsable','f-responsable-email','f-estado','f-relato']
+    .forEach(id => document.getElementById(id).classList.remove('field-error'));
+  document.getElementById('modal-validation-msg').style.display = 'none';
+}
+
+function saveCase() {
+  // ── Validación campos obligatorios ──
+  const required = ['f-fecha','f-hora','f-sede','f-servicio','f-tipo','f-motivo','f-apellido','f-nombre','f-dni','f-criticidad','f-responsable','f-responsable-email','f-estado','f-relato'];
+  let valid = true;
+  required.forEach(id => {
+    const el = document.getElementById(id);
+    if (!el.value.trim()) { el.classList.add('field-error'); valid = false; }
+    else { el.classList.remove('field-error'); }
+  });
+  const msgEl = document.getElementById('modal-validation-msg');
+  if (!valid) { msgEl.style.display = 'block'; msgEl.textContent = '⚠️ Completá todos los campos obligatorios marcados con *'; return; }
+
+  // Validar formato de emails
+  const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+  const respEmail = document.getElementById('f-responsable-email').value.trim();
+  const presEmail = document.getElementById('f-mail-presentante').value.trim();
+  if (!emailRegex.test(respEmail)) {
+    document.getElementById('f-responsable-email').classList.add('field-error');
+    msgEl.style.display = 'block'; msgEl.textContent = '⚠️ El email del responsable no tiene un formato válido.'; return;
+  }
+  if (presEmail && !emailRegex.test(presEmail)) {
+    document.getElementById('f-mail-presentante').classList.add('field-error');
+    msgEl.style.display = 'block'; msgEl.textContent = '⚠️ El mail del presentante no tiene un formato válido.'; return;
+  }
+  msgEl.style.display = 'none';
+  const nc = {
+    fecha:document.getElementById('f-fecha').value, hora:document.getElementById('f-hora').value,
+    sede:document.getElementById('f-sede').value, servicio:document.getElementById('f-servicio').value,
+    tipo:document.getElementById('f-tipo').value, motivo:document.getElementById('f-motivo').value,
+    apellido:document.getElementById('f-apellido').value, nombre:document.getElementById('f-nombre').value,
+    dni:document.getElementById('f-dni').value,
+    mail_presentante:document.getElementById('f-mail-presentante').value,
+    telefono:document.getElementById('f-telefono').value,
+    criticidad:document.getElementById('f-criticidad').value, responsable:document.getElementById('f-responsable').value,
+    responsable_email:document.getElementById('f-responsable-email').value.trim().toLowerCase(),
+    estado:document.getElementById('f-estado').value,
+    vencimiento:document.getElementById('f-vencimiento').value,
+    relato:document.getElementById('f-relato').value,
+    respuesta:document.getElementById('f-respuesta').value,
+    accion:document.getElementById('f-accion').value,
+  };
+  const isNew = !editingId;
+  if (editingId) {
+    const idx=data.findIndex(x=>x.id===editingId);
+    if(idx!==-1) { data[idx]={...data[idx],...nc}; saveCaso(data[idx]); }
+  } else {
+    casosRef.orderBy('id','desc').limit(1).get().then(function(snap) {
+      var maxId = 0;
+      snap.forEach(function(doc){ maxId = doc.data().id || 0; });
+      nc.id = maxId + 1;
+      data.push(nc);
+      saveCaso(nc);
+      if(isNew) sendNotificationEmails(nc);
+    });
+    closeModal(); updateTimestamp(); return;
+  }
+  closeModal(); updateTimestamp();
+  if (isNew) sendNotificationEmails(nc);
+}
+
+// ─── CONFIGURACIÓN EMAILJS ─────────────────────────────────
+// Para activar: registrate en https://www.emailjs.com (gratis)
+// y reemplazá estos valores con los tuyos:
+var EMAILJS_PUBLIC_KEY   = 'nS7aYbFLrj5yl4sZb';
+var EMAILJS_SERVICE_ID   = 'service_e44ykfo';
+var EMAILJS_TEMPLATE_ID  = 'template_6vwexef';
+var emailjsReady = false;
+try {
+  if (EMAILJS_PUBLIC_KEY !== 'TU_PUBLIC_KEY') {
+    emailjs.init({ publicKey: EMAILJS_PUBLIC_KEY });
+    emailjsReady = true;
+  }
+} catch(e) {}
+
+function sendNotificationEmails(nc) {
+  if (!emailjsReady) return; // EmailJS no configurado aún
+
+  const appUrl = 'https://csalgado-ui.github.io/Quejas-Cemic/tablero_quejas.html';
+
+  // ── Mail al responsable ──
+  if (nc.responsable_email) {
+    emailjs.send(EMAILJS_SERVICE_ID, EMAILJS_TEMPLATE_ID, {
+      to_email:    nc.responsable_email,
+      to_name:     nc.responsable || nc.responsable_email,
+      caso_id:     nc.id,
+      caso_tipo:   nc.tipo,
+      caso_sede:   nc.sede,
+      caso_crit:   nc.criticidad,
+      paciente:    `${nc.apellido} ${nc.nombre}`,
+      app_url:     appUrl,
+      message:     `Usted tiene una nueva notificacion en el Sistema de Quejas de CEMIC.\n\nPara acceder al sistema use las siguientes credenciales:\n- Usuario: ${nc.responsable_email}\n- Contrasena: 1234\n\nPor seguridad, le recomendamos cambiar su contrasena la primera vez que ingrese (boton "Clave" en la esquina superior derecha).`
+    }).catch(err => console.warn('EmailJS error:', err));
+  }
+
+  // ── Mail adicional si criticidad Alta/Crítica o Caso Crítico ──
+  if (nc.criticidad === 'Alta' || nc.criticidad === 'Crítica' || nc.tipo === 'Caso Crítico') {
+    const emailDir = (nc.sede === 'Saavedra') ? 'direccionsaav@cemic.edu.ar' : 'csalgado@cemic.edu.ar';
+    emailjs.send(EMAILJS_SERVICE_ID, EMAILJS_TEMPLATE_ID, {
+      to_email:    emailDir,
+      to_name:     'Dirección',
+      caso_id:     nc.id,
+      caso_tipo:   nc.tipo,
+      caso_sede:   nc.sede,
+      caso_crit:   nc.criticidad,
+      paciente:    `${nc.apellido} ${nc.nombre}`,
+      app_url:     appUrl,
+      message:     `ALERTA: Se registro un caso de criticidad ${nc.criticidad} en sede ${nc.sede}. Usted tiene una notificacion en el Sistema de Quejas de CEMIC.\n\nPara acceder:\n- Usuario: ${emailDir}\n- Contrasena: 1234`
+    }).catch(err => console.warn('EmailJS error dirección:', err));
+  }
+}
+function updateEstado(id, nuevoEstado) {
+  const idx = data.findIndex(x => x.id === id);
+  if (idx !== -1) {
+    data[idx].estado = nuevoEstado;
+    saveCaso(data[idx]);
+    refresh(); updateTimestamp();
+  }
+}
+function editCase(id) { openModal(id); }
+function deleteCase(id) {
+  const caso = data.find(d => d.id === id);
+  const nombre = caso ? `${caso.apellido} ${caso.nombre} (#${id})` : `#${id}`;
+  if(!confirm(`¿Estás seguro que querés eliminar el caso ${nombre}?\n\nEsta acción no se puede deshacer.`)) return;
+  deleteCaso(id);
+  data = data.filter(d => d.id !== id);
+  refresh();
+  updateTimestamp();
+}
+document.getElementById('modal-overlay').addEventListener('click', function(e){ if(e.target===this) closeModal(); });
+
+// ─── CAMBIO DE CONTRASEÑA ──────────────────────────────────
+function openChangePass() {
+  document.getElementById('change-pass-modal').classList.add('active');
+  document.getElementById('cp-old').value='';
+  document.getElementById('cp-new').value='';
+  document.getElementById('cp-new2').value='';
+  document.getElementById('cp-error').style.display='none';
+}
+function closeChangePass() { document.getElementById('change-pass-modal').classList.remove('active'); }
+function doChangePass() {
+  const oldP = document.getElementById('cp-old').value;
+  const newP = document.getElementById('cp-new').value;
+  const newP2 = document.getElementById('cp-new2').value;
+  const errEl = document.getElementById('cp-error');
+  const PASS_KEY = 'cemic_passwords_v1';
+  let passwords = {};
+  try { passwords = JSON.parse(localStorage.getItem(PASS_KEY)||'{}'); } catch(e){}
+  const storedPass = passwords[currentUser.email] || '1234';
+  if (oldP !== storedPass) { errEl.textContent='Contraseña actual incorrecta.'; errEl.style.display='block'; return; }
+  if (newP.length < 4) { errEl.textContent='La nueva contraseña debe tener al menos 4 caracteres.'; errEl.style.display='block'; return; }
+  if (newP !== newP2) { errEl.textContent='Las contraseñas nuevas no coinciden.'; errEl.style.display='block'; return; }
+  passwords[currentUser.email] = newP;
+  localStorage.setItem(PASS_KEY, JSON.stringify(passwords));
+  closeChangePass();
+  alert('✅ Contraseña actualizada correctamente.');
+}
+
+// ─── AUTO-REFRESH (detecta cambios del responsable) ───────
+// Firebase onSnapshot maneja actualizaciones en tiempo real
+
+// Arranque: ocultar main hasta que haya sesión
+document.querySelector('main').style.display = 'none';
+if (currentUser) {
+  showApp();
+}
+// Si no hay sesión, la pantalla de login es visible por defecto
+</script>
+
+<!-- ── MODAL CAMBIO DE CONTRASEÑA ──────────────────────────── -->
+<div class="modal-overlay" id="change-pass-modal">
+  <div class="modal" style="max-width:420px">
+    <div class="modal-title">🔑 Cambiar Contraseña</div>
+    <div style="display:flex;flex-direction:column;gap:14px">
+      <div class="form-group">
+        <label>Contraseña Actual</label>
+        <input type="password" id="cp-old" placeholder="••••••••">
+      </div>
+      <div class="form-group">
+        <label>Nueva Contraseña</label>
+        <input type="password" id="cp-new" placeholder="••••••••">
+      </div>
+      <div class="form-group">
+        <label>Repetir Nueva Contraseña</label>
+        <input type="password" id="cp-new2" placeholder="••••••••">
+      </div>
+      <div style="color:var(--queja);font-size:0.82rem;display:none;background:#fdecea;border-radius:8px;padding:8px 12px" id="cp-error"></div>
+    </div>
+    <div class="modal-actions">
+      <button class="btn btn-outline" onclick="closeChangePass()">Cancelar</button>
+      <button class="btn" onclick="doChangePass()">Guardar</button>
+    </div>
+  </div>
+</div>
+
+</body>
+</html>
